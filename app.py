@@ -21,11 +21,13 @@ def generate_frames():
         results = model.track(frame, persist=True)
         # class_names = model.names
         
-
+        qtd_atendentes = 0
+        qtd_clientes = 0
         for result in results:
             for i in range(len(result.boxes)):
                 class_name = result.names[result.boxes[i].cls[0].item()]
                 if class_name.strip() == 'Cliente':
+                    qtd_clientes += 1
                     # print(class_name)
                     box_id = int(result.boxes[i].id)
                     box_coordinates = result.boxes[i].xyxy[0].cpu().numpy()
@@ -49,12 +51,17 @@ def generate_frames():
                         (255, 255, 255),
                         2,
                     )
+                else:
+                    qtd_atendentes += 1
 
             frame_predicted = result.plot(boxes=True, conf=False) # Track
 
             ret, buffer = cv.imencode('.jpg', frame_predicted)
             frame_final = buffer.tobytes()
-
+            print('-----------------')
+            print(f'Quantidade de Atendentes: {qtd_atendentes}')
+            print(f'Quantidade de Clientes: {qtd_clientes}')
+            print('-----------------')
             yield (b'--frame\r\n'
                         b'Content-Type: image/jpeg\r\n\r\n' + frame_final + b'\r\n')
 
