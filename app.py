@@ -1,4 +1,4 @@
-from flask import Flask, render_template, Response
+from flask import Flask, render_template, Response, jsonify
 import cv2 as cv
 from ultralytics import YOLO
 from datetime import datetime
@@ -7,15 +7,17 @@ app = Flask(__name__)
 
 model=YOLO('best.pt')
 
+video = cv.VideoCapture('cr.mp4')
+
 def generate_frames():
-    video_capture = cv.VideoCapture('cr.mp4')
+    
 
     box_entry_time = {}
     while True:
-        success, frame = video_capture.read()
+        success, frame = video.read()
         
         if not success:
-            video_capture.set(cv.CAP_PROP_POS_FRAMES, 0)
+            video.set(cv.CAP_PROP_POS_FRAMES, 0)
             continue
 
         results = model.track(frame, persist=True)
@@ -56,12 +58,10 @@ def generate_frames():
 
             frame_predicted = result.plot(boxes=True, conf=False) # Track
 
-            ret, buffer = cv.imencode('.jpg', frame_predicted)
+            _, buffer = cv.imencode('.jpg', frame_predicted)
             frame_final = buffer.tobytes()
-            print('-----------------')
-            print(f'Quantidade de Atendentes: {qtd_atendentes}')
-            print(f'Quantidade de Clientes: {qtd_clientes}')
-            print('-----------------')
+            app.config['qtd_atendentes'] = qtd_atendentes
+            app.config['qtd_clients'] = qtd_clientes
             yield (b'--frame\r\n'
                         b'Content-Type: image/jpeg\r\n\r\n' + frame_final + b'\r\n')
 
@@ -70,9 +70,22 @@ def generate_frames():
 def index():
     return render_template('index.html')
 
+
 @app.route('/video_feed')
 def video_feed():
     return Response(generate_frames(), mimetype='multipart/x-mixed-replace; boundary=frame')
+
+
+@app.route('/get_counts')
+def get_counts():
+    qtd_atendentes = app.config['qtd_atendentes']
+    qtd_clientes = app.config['qtd_clients']
+    return jsonify(
+        {
+            'qtd_atendentes': qtd_atendentes,
+            'qtd_clientes': qtd_clientes
+        }
+    )
 
 if __name__ == '__main__':
     app.run(debug=True)
