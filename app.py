@@ -2,12 +2,18 @@ from flask import Flask, render_template, Response, jsonify
 import cv2 as cv
 from ultralytics import YOLO
 from datetime import datetime
+import os
+import csv
 
 app = Flask(__name__)
 
-model=YOLO('best.pt')
+model=YOLO('best_30.pt')
 
-video = cv.VideoCapture('cr.mp4')
+video = cv.VideoCapture('video_1.mp4')
+
+nome_arquivo_csv = "dados_tempo_atendimento.csv"
+cabecalho = ["ID", "hora_entrada", "data_entrada", "hora_saida", "data_saida", "tempo_de_permanencia"]
+
 
 def generate_frames():
     box_entry_time = {}
@@ -20,20 +26,30 @@ def generate_frames():
             video.set(cv.CAP_PROP_POS_FRAMES, 0)
             continue
 
-        results = model.track(frame, persist=True)
+        results = model.track(frame, persist=True, verbose=False, show=False)
         # class_names = model.names
         
+
         qtd_atendentes = 0
         qtd_clientes = 0
         for result in results:
+            IDs_atuais = []
             for i in range(len(result.boxes)):
+                if result.boxes[i].id is None:
+                    _, buffer = cv.imencode('.jpg', frame)
+                    frame_final = buffer.tobytes()
+                    app.config['qtd_atendentes'] = qtd_atendentes
+                    app.config['qtd_clients'] = qtd_clientes
+                    yield (b'--frame\r\n'
+                                b'Content-Type: image/jpeg\r\n\r\n' + frame_final + b'\r\n')
+                    continue
+
+
                 class_name = result.names[result.boxes[i].cls[0].item()]
                 if class_name.strip() == 'Cliente':
                     qtd_clientes += 1
-                    # print(class_name)
                     box_id = int(result.boxes[i].id)
-                    list_de_box_ids = [4, 5]
-                    dicionario = {1, 4, 5}
+                    IDs_atuais.append(box_id)
 
                     # Rotina para gerar informações sobre o tempo de atendimento do cliente.
                     current_time = datetime.now()
@@ -64,18 +80,7 @@ def generate_frames():
                         time_account_by_id[box_id][3] = f"{int(hours)}h {int(minutes)}m {int(seconds)}s {milliseconds}ms"
                     
                         if time_account_by_id[box_id][2] != time_account_by_id[box_id][1]:
-                            print('hahahaha')
-                            print(box_id)
-                            print(time_account_by_id[box_id][0])
-                            print(time_account_by_id[box_id][1])
-                            print(time_account_by_id[box_id][2])
-                            print(time_account_by_id[box_id][3])
-                            print('hahahaha')
                             time_account_by_id[box_id][1] = time_account_by_id[box_id][2]
-                        elif time_account_by_id[box_id][2] == time_account_by_id[box_id][1]:
-                            # escrever aqui a rotina de CSV
-                            # time_account_by_id.pop([box_id])
-                            print('hihihihi')
 
 
                     # Rotina para plotar as caixas e o tempo decorrido
@@ -103,7 +108,30 @@ def generate_frames():
                 else:
                     qtd_atendentes += 1
 
-            print(time_account_by_id)
+            IDs_para_serem_deletados_do_dicionario = []
+            for chave_id in time_account_by_id.keys():
+                if chave_id not in IDs_atuais:
+                    print(time_account_by_id[chave_id]) #Fazer um log
+                    IDs_para_serem_deletados_do_dicionario.append(chave_id)
+                    csv_existe = os.path.isfile(nome_arquivo_csv)
+
+                    with open(nome_arquivo_csv, mode='a', newline='') as arquivo_csv:
+                        escritor_csv = csv.writer(arquivo_csv)
+
+                        if not csv_existe:
+                            escritor_csv.writerow(cabecalho)
+
+                        id_csv = chave_id
+                        hora_entrada_csv = f'{time_account_by_id[chave_id][0][0]}:{time_account_by_id[chave_id][0][1]}:{time_account_by_id[chave_id][0][2]}'
+                        data_entrada_csv = f'{time_account_by_id[chave_id][0][4]}/{time_account_by_id[chave_id][0][5]}/{time_account_by_id[chave_id][0][6]}'
+                        hora_saida_csv = f'{time_account_by_id[chave_id][2][0]}:{time_account_by_id[chave_id][2][1]}:{time_account_by_id[chave_id][2][2]}'
+                        data_saida_csv = f'{time_account_by_id[chave_id][2][4]}/{time_account_by_id[chave_id][2][5]}/{time_account_by_id[chave_id][2][6]}'
+                        tempo_permanencia_csv = time_account_by_id[chave_id][3]
+                        escritor_csv.writerow([id_csv, hora_entrada_csv, data_entrada_csv, hora_saida_csv, data_saida_csv, tempo_permanencia_csv])
+
+            for id_del_dict in IDs_para_serem_deletados_do_dicionario:    
+                del time_account_by_id[id_del_dict]
+
             frame_predicted = result.plot(boxes=True, conf=False) # Track
 
             _, buffer = cv.imencode('.jpg', frame_predicted)
@@ -136,4 +164,4 @@ def get_counts():
     )
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    app.run(debug=False)
