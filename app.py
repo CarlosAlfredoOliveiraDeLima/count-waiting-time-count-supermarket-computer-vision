@@ -62,16 +62,18 @@ def generate_frames():
                 classe = result.names[result.boxes[i].cls[0].item()]
 
                 if classe.strip() == 'Cliente':
+                    qtd_clientes += 1
+                    IDs_atuais.append(box_id)
+
                     if box_id not in box_entry_time:
-                            # Se não estiver, adicione o ID ao dicionário com o tempo atual
-                            box_entry_time[box_id] = datetime.now()
+                        # Se não estiver, adicione o ID ao dicionário com o tempo atual
+                        box_entry_time[box_id] = datetime.now()
                     # Calcule o tempo de permanência
                     entry_time = box_entry_time[box_id]
                     current_time = datetime.now()
                     time_difference = current_time - entry_time
                     seconds_passed = time_difference.total_seconds()
                     # Desenhe o tempo no frame
-
 
                     if seconds_passed > 15:
                         cv.rectangle(frame, (x_min_abs, y_min_abs), (x_max_abs, y_max_abs), (0, 255, 0), 2)
@@ -85,74 +87,40 @@ def generate_frames():
                             (255, 255, 255),
                             2,
                         )
-                elif classe.strip() == 'Atendente':
-                    ...
 
-                # class_name = result.names[result.boxes[i].cls[0].item()]
+                    # Rotina para gerar informações sobre o tempo de atendimento do cliente.
+                    current_time = datetime.now()
+                    if box_id not in time_account_by_id:
+                        time_account_by_id[box_id] = [
+                            [current_time.hour, current_time.minute, current_time.second, current_time.microsecond // 1000,current_time.day, current_time.month, current_time.year], 
+                            [current_time.hour, current_time.minute, current_time.second, current_time.microsecond // 1000, current_time.day, current_time.month, current_time.year],
+                            [current_time.hour, current_time.minute, current_time.second, current_time.microsecond // 1000, current_time.day, current_time.month, current_time.year],  
+                            0
+                            ]
+                    else:
+                        time_account_by_id[box_id][2] = [current_time.hour, current_time.minute, current_time.second, current_time.microsecond // 1000, current_time.day, current_time.month, current_time.year]
 
-                # if class_name.strip() == 'Cliente':
-                #     qtd_clientes += 1
-                #     box_id = int(result.boxes[i].id)
-                #     IDs_atuais.append(box_id)
+                        diff_seconds = (
+                            datetime(current_time.year, current_time.month, current_time.day,
+                                    time_account_by_id[box_id][2][0], time_account_by_id[box_id][2][1], time_account_by_id[box_id][2][2],
+                                    time_account_by_id[box_id][2][3])
+                            - datetime(current_time.year, current_time.month, current_time.day,
+                                        time_account_by_id[box_id][0][0], time_account_by_id[box_id][0][1], time_account_by_id[box_id][0][2],
+                                        time_account_by_id[box_id][0][3])
+                        ).total_seconds()
 
-                #     # Rotina para gerar informações sobre o tempo de atendimento do cliente.
-                #     current_time = datetime.now()
-                #     if box_id not in time_account_by_id:
-                #         time_account_by_id[box_id] = [
-                #             [current_time.hour, current_time.minute, current_time.second, current_time.microsecond // 1000,current_time.day, current_time.month, current_time.year], 
-                #             [current_time.hour, current_time.minute, current_time.second, current_time.microsecond // 1000, current_time.day, current_time.month, current_time.year],
-                #             [current_time.hour, current_time.minute, current_time.second, current_time.microsecond // 1000, current_time.day, current_time.month, current_time.year],  
-                #             0
-                #             ]
-                #     else:
-                #         time_account_by_id[box_id][2] = [current_time.hour, current_time.minute, current_time.second, current_time.microsecond // 1000, current_time.day, current_time.month, current_time.year]
+                        hours, remainder = divmod(diff_seconds, 3600)
+                        minutes, seconds = divmod(remainder, 60)
+                        seconds, milliseconds = divmod(int(seconds * 1000), 1000)
 
-                #         diff_seconds = (
-                #             datetime(current_time.year, current_time.month, current_time.day,
-                #                     time_account_by_id[box_id][2][0], time_account_by_id[box_id][2][1], time_account_by_id[box_id][2][2],
-                #                     time_account_by_id[box_id][2][3])
-                #             - datetime(current_time.year, current_time.month, current_time.day,
-                #                         time_account_by_id[box_id][0][0], time_account_by_id[box_id][0][1], time_account_by_id[box_id][0][2],
-                #                         time_account_by_id[box_id][0][3])
-                #         ).total_seconds()
-
-                #         hours, remainder = divmod(diff_seconds, 3600)
-                #         minutes, seconds = divmod(remainder, 60)
-                #         seconds, milliseconds = divmod(int(seconds * 1000), 1000)
-
-                #         # time_account_by_id[box_id][3] = f"{int(hours)}h {int(minutes)}m {int(seconds)}s"
-                #         time_account_by_id[box_id][3] = f"{int(hours)}h {int(minutes)}m {int(seconds)}s {milliseconds}ms"
+                        # time_account_by_id[box_id][3] = f"{int(hours)}h {int(minutes)}m {int(seconds)}s"
+                        time_account_by_id[box_id][3] = f"{int(hours)}h {int(minutes)}m {int(seconds)}s {milliseconds}ms"
                     
-                #         if time_account_by_id[box_id][2] != time_account_by_id[box_id][1]:
-                #             time_account_by_id[box_id][1] = time_account_by_id[box_id][2]
+                        if time_account_by_id[box_id][2] != time_account_by_id[box_id][1]:
+                            time_account_by_id[box_id][1] = time_account_by_id[box_id][2]
 
-
-                #     # Rotina para plotar as caixas e o tempo decorrido
-                #     box_coordinates = result.boxes[i].xyxy[0].cpu().numpy()
-                #     # Verifique se o ID já está no dicionário
-                #     if box_id not in box_entry_time:
-                #         # Se não estiver, adicione o ID ao dicionário com o tempo atual
-                #         box_entry_time[box_id] = datetime.now()
-                #     # Calcule o tempo de permanência
-                #     entry_time = box_entry_time[box_id]
-                #     current_time = datetime.now()
-                #     time_difference = current_time - entry_time
-                #     seconds_passed = time_difference.total_seconds()
-                #     # Desenhe o tempo no frame
-
-                #     if seconds_passed > 15:
-                #         cv.putText(
-                #             frame,
-                #             # f"ID {box_id}: {int(seconds_passed)}s",
-                #             f"Tempo de espera: {int(seconds_passed)}s",
-                #             (int(box_coordinates[0]), int(box_coordinates[1] - 30)),
-                #             cv.FONT_HERSHEY_SIMPLEX,
-                #             0.5,
-                #             (255, 255, 255),
-                #             2,
-                #         )
-                # else:
-                #     qtd_atendentes += 1
+                elif classe.strip() == 'Atendente':
+                    qtd_atendentes += 1
 
             IDs_para_serem_deletados_do_dicionario = []
             for chave_id in time_account_by_id.keys():
